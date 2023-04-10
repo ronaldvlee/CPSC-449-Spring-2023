@@ -32,7 +32,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS users
 
 # inserts in the user admin with password admin into the database if there are no users
 c.execute(f'''INSERT INTO users (username, password)
-            SELECT 'admin', {generate_password_hash('admin')}
+            SELECT 'admin', '{generate_password_hash('admin')}'
             WHERE NOT EXISTS (SELECT * FROM users LIMIT 1);
             ''')
 conn.commit()
