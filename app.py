@@ -39,6 +39,7 @@ c.execute(f'''INSERT INTO users (username, password)
             SELECT 'admin', '{generate_password_hash('admin')}'
             WHERE NOT EXISTS (SELECT * FROM users LIMIT 1);
             ''')
+
 conn.commit()
 conn.close()
 
