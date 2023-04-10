@@ -95,10 +95,11 @@ def upload_file():
     if 'file' not in request.files:
         return jsonify({'message': 'No file part!'}), 400
     file = request.files['file']
-    # If user does not select file, browser also
-    # submit an empty part without filename
+    
+    # If user does not select file
     if file.filename == '':
         return jsonify({'message': 'No selected file!'}), 400
+    
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
