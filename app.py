@@ -93,19 +93,18 @@ def upload_file():
     
     # Check if the post request has the file part
     if 'file' not in request.files:
-        return jsonify({'message': 'No file part!'}), 400
+        abort(400, 'No file part')
     file = request.files['file']
     
     # If user does not select file
     if file.filename == '':
-        return jsonify({'message': 'No selected file!'}), 400
-    
+        abort(400, 'No selected file')
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return jsonify({'message': 'File uploaded successfully!'}), 200
     else:
-        return jsonify({'message': 'File extension not allowed! Allowed file types: ' + ', '.join(app.config['ALLOWED_EXTENSIONS']) }), 400
+        abort(400, 'File extension not allowed! Allowed file types: ' + ', '.join(app.config['ALLOWED_EXTENSIONS']))
     
 # Task 5: Public endpoint to list file names and sizes
 @app.route('/public_information')
@@ -139,19 +138,19 @@ def login():
     auth = request.json
 
     if not auth or not auth['username'] or not auth['password']:
-        return jsonify({'message': 'Could not verify!'}), 401
+        abort(401, 'Cannot verify')
 
     user = User.get_by_username(auth['username'])
 
     if not user:
-        return jsonify({'message': 'User does not exist!'}), 401
+        abort(401, 'User does not exist')
 
     # checking if the password matches the hash
     if check_password_hash(user.password, auth['password']):
         token = jwt.encode({'id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm='HS256')
         return jsonify({'token': token}), 200
 
-    return jsonify({'message': 'Invalid credentials!'}), 401
+    abort(401, 'Invalid credientials')
 
 # Sign up endpoint
 @app.route('/signup', methods=['POST'])
@@ -160,13 +159,13 @@ def signup():
     password = request.json.get('password', None)
 
     if not username:
-        return jsonify({'message': 'Username is required'}), 400
+        abort(400, 'Username is required')
     if not password:
-        return jsonify({'message': 'Password is required'}), 400
+        abort(400, 'Password is required')
 
     user = User.get_by_username(username)
     if user:
-        return jsonify({'message': 'Username already exists'}), 400
+        abort(400, 'Username already exists')
     
     # hash the password
     password = generate_password_hash(password)
