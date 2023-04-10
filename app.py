@@ -1,4 +1,9 @@
-from flask import Flask, request, jsonify
+# To obtain login token..
+# Username: admin
+# Password: admin
+#
+
+from flask import Flask, abort, request, jsonify
 
 import sqlite3
 import jwt
@@ -7,16 +12,18 @@ import os
 from datetime import timedelta, datetime
 from werkzeug.utils import secure_filename
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "YEP"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'txt', 'pdf', 'png', 'jpg'}
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB
+app.config['DATABASE_FILE'] = "users.db"
 
 # Connect Flask application with SQLite3 database
 # Create a database for users
-conn = sqlite3.connect('users.db')
+conn = sqlite3.connect(app.config['DATABASE_FILE'])
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS users 
              (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,6 +32,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS users
 conn.commit()
 conn.close()
 
+# The User Model, used to connect to the database and fetch the username
 class User:
     def __init__(self, id, username, password):
         self.id = id
@@ -33,7 +41,7 @@ class User:
     
     @staticmethod
     def get_by_username(username):
-        conn = sqlite3.connect('users.db')
+        conn = sqlite3.connect(app.config['DATABASE_FILE'])
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=?", (username,))
         row = c.fetchone()
@@ -51,12 +59,12 @@ def token_required(f):
         if 'Authorization' in request.headers:
             token = request.headers['Authorization'].split(' ')[1]
         if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
+            abort(401, "Token is missing!")
 
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
         except:
-            return jsonify({'message': 'Token is invalid!'}), 401
+            abort(401, "Token is invalid!")
 
         return f(*args, **kwargs)
 
@@ -110,13 +118,27 @@ def upload_file():
 # Task 5: Public endpoint to list file names and sizes
 @app.route('/public_information')
 def public_information():
+    # Get list of files in the uploads directory
     files = []
     for filename in os.listdir(app.config['UPLOAD_FOLDER']):
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         if os.path.isfile(path):
             size = os.path.getsize(path)
             files.append({'name': filename, 'size': size})
-    return jsonify(files)
+
+    # Get list of users and their hashed passwords from the database
+    users = []
+    conn = sqlite3.connect(app.config['DATABASE_FILE'])
+    cursor = conn.execute("SELECT username, password FROM users")
+    for row in cursor:
+        user = {'username': row[0], 'password': row[1]}
+        users.append(user)
+    conn.close()
+
+    # Combine the lists of files and users into a single dictionary
+    response = {'files': files, 'users': users}
+
+    return jsonify(response)
         
 # Sign up route
 @app.route('/signup', methods=['POST'])
@@ -132,6 +154,9 @@ def signup():
     user = User.get_by_username(username)
     if user:
         return jsonify({'message': 'Username already exists'}), 400
+    
+    # hash the password
+    password = generate_password_hash(password)
 
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -155,7 +180,7 @@ def login():
         return jsonify({'message': 'User does not exist!'}), 401
 
     # no encryption within this api
-    if user.password == auth['password']:
+    if check_password_hash(user.password, auth['password']):
         token = jwt.encode({'id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm='HS256')
         return jsonify({'token': token}), 200
 
