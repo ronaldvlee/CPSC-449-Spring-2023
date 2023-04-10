@@ -23,6 +23,10 @@ Run Flask: `py -m flask run`
 
 Run in Debug Mode: `py -m flask --debug run`
 
+## List of endpoints on POSTMAN
+
+![POSTMAN endpoints](https://user-images.githubusercontent.com/23162016/230981627-3c6e731b-a913-4de8-b7f1-cc5d333ad6f8.png)
+
 ## Credits
 **Author**: Ronald Lee
 
