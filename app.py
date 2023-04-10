@@ -1,7 +1,6 @@
 # To obtain login token..
 # Username: admin
 # Password: admin
-#
 
 from flask import Flask, abort, request, jsonify
 
@@ -22,13 +21,20 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB
 app.config['DATABASE_FILE'] = "users.db"
 
 # Connect Flask application with SQLite3 database
-# Create a database for users
+# Create a database for users if not already generated
 conn = sqlite3.connect(app.config['DATABASE_FILE'])
 c = conn.cursor()
+
 c.execute('''CREATE TABLE IF NOT EXISTS users 
-             (id INTEGER PRIMARY KEY AUTOINCREMENT,
-              username TEXT NOT NULL,
-              password TEXT NOT NULL)''')
+            (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL)''')
+
+# inserts in the user admin with password admin into the database if there are no users
+c.execute(f'''INSERT INTO users (username, password)
+            SELECT 'admin', {generate_password_hash('admin')}
+            WHERE NOT EXISTS (SELECT * FROM users LIMIT 1);
+            ''')
 conn.commit()
 conn.close()
 
@@ -50,7 +56,8 @@ class User:
             return None
         user = User(row[0], row[1], row[2])
         return user
-    
+
+# Task 3: Auth    
 # JWT token required decorator, anything needed for auth will be decorated with @token_required
 def token_required(f):
     @wraps(f)
@@ -70,28 +77,7 @@ def token_required(f):
 
     return decorated
 
-# Error handling
-@app.errorhandler(400)
-def bad_request(error):
-    return jsonify({'error': 'Bad request', 'message': error.description}), 400
-
-@app.errorhandler(401)
-def unauthorized(error):
-    return jsonify({'error': 'Unauthorized', 'message': error.description}), 401
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Not found', 'message': error.description}), 404
-
-@app.errorhandler(500)
-def internal_server_error(error):
-    return jsonify({'error': 'Internal server error', 'message': error.description}), 500   
-
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    return jsonify({'error': 'File too large!', 'message': error.description}), 413
-
-# Upload file endpoint
+# Task 4: Upload file endpoint
 @app.route('/upload', methods=['POST'])
 @token_required
 def upload_file():
@@ -139,8 +125,29 @@ def public_information():
     response = {'files': files, 'users': users}
 
     return jsonify(response)
-        
-# Sign up route
+
+# Task 3: Auth
+# Login endpoint
+@app.route('/login', methods=['POST'])
+def login():
+    auth = request.json
+
+    if not auth or not auth['username'] or not auth['password']:
+        return jsonify({'message': 'Could not verify!'}), 401
+
+    user = User.get_by_username(auth['username'])
+
+    if not user:
+        return jsonify({'message': 'User does not exist!'}), 401
+
+    # checking if the password matches the hash
+    if check_password_hash(user.password, auth['password']):
+        token = jwt.encode({'id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm='HS256')
+        return jsonify({'token': token}), 200
+
+    return jsonify({'message': 'Invalid credentials!'}), 401
+
+# Sign up endpoint
 @app.route('/signup', methods=['POST'])
 def signup():
     username = request.json.get('username', None)
@@ -166,25 +173,26 @@ def signup():
 
     return jsonify({'message': 'User created successfully'}), 201
 
-# Login endpoint
-@app.route('/login', methods=['POST'])
-def login():
-    auth = request.json
+# Task 2: Error handling
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({'error': 'Bad request', 'message': error.description}), 400
 
-    if not auth or not auth['username'] or not auth['password']:
-        return jsonify({'message': 'Could not verify!'}), 401
+@app.errorhandler(401)
+def unauthorized(error):
+    return jsonify({'error': 'Unauthorized', 'message': error.description}), 401
 
-    user = User.get_by_username(auth['username'])
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found', 'message': error.description}), 404
 
-    if not user:
-        return jsonify({'message': 'User does not exist!'}), 401
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({'error': 'Internal server error', 'message': error.description}), 500   
 
-    # no encryption within this api
-    if check_password_hash(user.password, auth['password']):
-        token = jwt.encode({'id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm='HS256')
-        return jsonify({'token': token}), 200
-
-    return jsonify({'message': 'Invalid credentials!'}), 401
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return jsonify({'error': 'File too large!', 'message': error.description}), 413
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)
