@@ -20,6 +20,10 @@ app.config['ALLOWED_EXTENSIONS'] = {'txt', 'pdf', 'png', 'jpg'}
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB
 app.config['DATABASE_FILE'] = "users.db"
 
+# Create the upload folder
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
 # Connect Flask application with SQLite3 database
 # Create a database for users if not already generated
 conn = sqlite3.connect(app.config['DATABASE_FILE'])
