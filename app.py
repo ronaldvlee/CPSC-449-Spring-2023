@@ -105,7 +105,7 @@ def upload_file():
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return jsonify({'message': 'File uploaded successfully!'}), 200
     else:
-        return jsonify({'message': 'File not allowed!'}), 400
+        return jsonify({'message': 'File extension not allowed! Allowed file types: ' + ', '.join(app.config['ALLOWED_EXTENSIONS']) }), 400
     
 # Task 5: Public endpoint to list file names and sizes
 @app.route('/public_information')

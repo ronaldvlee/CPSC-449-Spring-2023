@@ -1,1 +1,1 @@
-Flask, jwt, sqlite3
+Flask, pyjwt, sqlite3
